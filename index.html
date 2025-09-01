@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Calculadora de Embalagens</title>
+<style>
+  :root{
+    --bg:#f5f6fa;--card:#ffffff;--primary:#2f80ed;--muted:#e9f0fb;--accent:#e3f2fd;
+    --orange-light:#ffe9d6;
+    --btn:#2f80ed; --btn-sec:#6b7280;
+    --modal-bg: rgba(0,0,0,.45);
+    --row-even:#f7f9fc; --row-odd:#ffffff;
+    --thead:#e6ecff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+  .wrap{max-width:980px;margin:auto;padding:24px}
+  .card{background:var(--card);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.06);padding:22px}
+  h1{margin:0 0 16px;font-size:22px}
+
+  /* inputs e grid (layout original) */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+  .field{display:flex;flex-direction:column;gap:6px;background:var(--muted);padding:12px;border-radius:12px}
+  .field label{font-weight:600;font-size:14px}
+  .field input{appearance:textfield;border:none;background:#fff;border-radius:10px;padding:10px 12px;font-size:16px;outline:2px solid transparent;transition:.2s}
+  .field input:focus{outline-color:var(--primary)}
+  .orange input{background:var(--orange-light)}
+  .hint{font-size:12px;color:#666}
+
+  /* resultados (layout original) */
+  .results{margin-top:18px;padding:14px;background:var(--accent);border-radius:12px}
+  .results h2{margin:0 0 10px;font-size:18px}
+  .table{width:100%;border-collapse:separate;border-spacing:0 8px}
+  .table th,.table td{text-align:left;padding:10px 12px}
+  .table th{font-size:13px;color:#4b5563}
+  .pill{background:#fff;border-radius:10px;padding:10px 12px;display:inline-block;min-width:120px}
+  .footer{margin-top:8px;color:#6b7280;font-size:12px}
+
+  .actions{margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .btn{background:var(--btn);color:#fff;border:none;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:14px;box-shadow:0 6px 18px rgba(47,128,237,.15);transition:.2s}
+  .btn:hover{transform:translateY(-1px)}
+  .btn-sec{background:var(--btn-sec)}
+  .counter{font-weight:600}
+  .counter .badge{background:#e5e7eb;border-radius:8px;padding:4px 8px;margin:0 6px}
+  .counter .clear{color:#ef4444;cursor:pointer;font-weight:800;margin-left:6px}
+
+  /* Modal moderno */
+  .modal-bg{position:fixed;inset:0;background:var(--modal-bg);display:none;align-items:center;justify-content:center;z-index:1000}
+  .modal{width:min(900px,92vw);background:#fff;border-radius:16px;padding:18px 18px 20px;box-shadow:0 30px 60px rgba(0,0,0,.25);animation:pop .12s ease-out}
+  @keyframes pop{from{transform:scale(.98);opacity:.7}to{transform:scale(1);opacity:1}}
+  .modal header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .modal h3{margin:0;font-size:18px}
+  .modal .close{border:none;background:transparent;font-size:20px;cursor:pointer;color:#6b7280}
+  .modal .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .modal .field{background:#f3f4f6}
+  .modal input{width:100%;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:14px;background:#fff}
+  .mini{font-size:12px;color:#6b7280;margin:6px 0 10px}
+
+  .table-modal{width:100%;border-collapse:separate;border-spacing:0 6px;margin-top:6px;table-layout:fixed}
+  .table-modal thead th{font-size:12px;color:#374151;background:var(--thead);border-radius:8px;padding:10px 10px}
+  .table-modal tbody td{padding:10px 10px;background:#fff}
+  .table-modal tbody tr:nth-child(even) td{background:var(--row-even)}
+  .table-modal tbody tr:nth-child(odd) td{background:var(--row-odd)}
+  .table-modal .col-num{width:50px}
+  .table-modal .col-desc{width:auto}
+  .table-modal .col-qtd{width:130px;text-align:right}
+  .table-modal .col-unit{width:180px;text-align:right}
+  .table-modal .col-total{width:150px;text-align:right}
+  .row-actions button{background:#ef4444;color:#fff;border:none;padding:6px 10px;border-radius:8px;cursor:pointer}
+  .modal footer{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
+
+  /* Área de impressão (tabela com colunas fixas e “respiro” do cabeçalho) */
+  @media print{
+    body{background:#fff}
+    .wrap,.modal-bg{display:none !important}
+    #print-area{display:block !important}
+  }
+  #print-area{display:none;padding:24px;font:14px/1.4 system-ui}
+  #print-area h2{margin:0 0 8px}
+  #print-area .head{display:flex;justify-content:space-between;gap:16px}
+  #print-area .box{border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-top:10px}
+
+  /* Tabela de impressão com layout fixo por colunas (similar ERP) */
+  #print-table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+    margin-top:12px;
+    table-layout:fixed; /* impede colunas de “moverem” */
+  }
+  #print-table th,#print-table td{
+    border:1px solid #e5e7eb;
+    padding:8px 10px;
+    text-align:left;
+    vertical-align:top;
+  }
+  #print-table thead th{
+    background:var(--thead);
+  }
+  /* colgroup com proporções aproximadas às medidas do PDF */
+  #print-table .col-num{width:8%}
+  #print-table .col-desc{width:42%}
+  #print-table .col-qtd{width:14%; text-align:right}
+  #print-table .col-unit{width:18%; text-align:right}
+  #print-table .col-total{width:18%; text-align:right}
+  /* “Respiro” entre o cabeçalho e os itens */
+  #print-table thead tr{height:40px}
+  #print-table tbody tr:nth-child(even){background:#f7f9fc}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Calculadora de Embalagens (PEBD)</h1>
+
+      <!-- Campos (largura, comprimento e espessura com fundo laranja claro) -->
+      <div class="grid" id="inputs">
+        <div class="field orange">
+          <label for="largura">Largura (cm)</label>
+          <input type="number" id="largura" step="0.01">
+        </div>
+        <div class="field orange">
+          <label for="comprimento">Comprimento (cm)</label>
+          <input type="number" id="comprimento" step="0.01">
+        </div>
+        <div class="field orange">
+          <label for="espessura">Espessura (mm)</label>
+          <input type="number" id="espessura" step="0.001">
+          <div class="hint">O valor é convertido para cm nos cálculos.</div>
+        </div>
+
+        <!-- Tipo de material (entra na descrição) -->
+        <div class="field">
+          <label for="tipoMaterial">Tipo de material</label>
+          <input type="text" id="tipoMaterial" maxlength="20" placeholder="Ex.: PEBD Virgem">
+        </div>
+
+        <div class="field">
+          <label for="pesoTotal">Peso total (Kg)</label>
+          <input type="number" id="pesoTotal" step="0.00001">
+        </div>
+        <div class="field">
+          <label for="valorKg">Valor do Kg (R$)</label>
+          <input type="number" id="valorKg" step="0.00001">
+        </div>
+        <div class="field">
+          <label for="densidade">Densidade (g/cm³)</label>
+          <input type="number" id="densidade" step="0.00001" value="0.92">
+        </div>
+        <div class="field">
+          <label for="precoUnidadeInput">Preço por unidade (R$)</label>
+          <input type="number" id="precoUnidadeInput" step="0.00001">
+        </div>
+        <div class="field">
+          <label for="qtdUnidades">Quantidade de unidades</label>
+          <input type="number" id="qtdUnidades" step="1">
+        </div>
+      </div>
+
+      <!-- Resultados -->
+      <div class="results">
+        <h2>Resultados</h2>
+        <table class="table">
+          <tbody>
+            <tr><td>Peso por unidade</td><td><span class="pill" id="pesoUnidade">–</span> Kg</td></tr>
+            <tr><td>Unidades por 1 Kg</td><td><span class="pill" id="qtdKg">–</span> un</td></tr>
+            <tr><td>Preço por unidade</td><td><span class="pill" id="precoUnidade">–</span></td></tr>
+            <tr><td>Quantidade total</td><td><span class="pill" id="qtdTotal">–</span> un</td></tr>
+            <tr><td>Peso total</td><td><span class="pill" id="pesoTotalSaida">–</span> Kg</td></tr>
+            <tr><td>Valor total</td><td><span class="pill" id="valorTotal">–</span></td></tr>
+          </tbody>
+        </table>
+        <div class="footer">As contas atualizam automaticamente enquanto você digita.</div>
+
+        <div class="actions">
+          <button class="btn" id="btnSalvar">Salvar item</button>
+          <span class="counter">Itens salvos <span class="badge" id="countItens">0</span>
+            <span class="clear" id="btnLimpar" title="Limpar todos">x</span>
+          </span>
+          <button class="btn btn-sec" id="btnAbrirModal">Gerar PDF / Enviar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de revisão + dados do cliente -->
+  <div class="modal-bg" id="modalBg">
+    <div class="modal">
+      <header>
+        <h3>Revisar itens & Dados do cliente</h3>
+        <button class="close" id="modalClose" title="Fechar">✕</button>
+      </header>
+
+      <!-- Dados do cliente (com máscaras estáveis) -->
+      <section>
+        <div class="grid2">
+          <div class="field">
+            <label for="clienteNome">Nome da empresa / Comprador</label>
+            <input id="clienteNome" type="text" placeholder="Ex.: ABC Embalagens / João Silva">
+          </div>
+          <div class="field">
+            <label for="clienteCpfCnpj">CPF/CNPJ</label>
+            <input id="clienteCpfCnpj" type="text" inputmode="numeric" placeholder="000.000.000-00 ou 00.000.000/0000-00" maxlength="18" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="clienteEmail">E-mail</label>
+            <input id="clienteEmail" type="email" placeholder="contato@empresa.com">
+          </div>
+          <div class="field">
+            <label for="clienteTelefone">Telefone</label>
+            <input id="clienteTelefone" type="text" inputmode="numeric" placeholder="(11) 91234-5678" maxlength="16" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="clienteEndereco">Endereço</label>
+            <input id="clienteEndereco" type="text" placeholder="Rua, número - Bairro - Cidade/UF">
+          </div>
+          <div class="field">
+            <label for="condicoes">Condições de pagamento</label>
+            <input id="condicoes" type="text" placeholder="Ex.: 28 dias" maxlength="30">
+          </div>
+        </div>
+
+        <div class="mini">Revise os itens abaixo. Você pode excluir qualquer um antes de gerar.</div>
+
+        <!-- Tabela dos itens salvos (colunas fixas) -->
+        <table class="table-modal">
+          <colgroup>
+            <col class="col-num">
+            <col class="col-desc">
+            <col class="col-qtd">
+            <col class="col-unit">
+            <col class="col-total">
+            <col style="width:90px">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Descrição (L x C x E - Material)</th>
+              <th>Quantidade</th>
+              <th>Preço Unitário</th>
+              <th>Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbodyItens"></tbody>
+        </table>
+      </section>
+
+      <footer>
+        <button class="btn btn-sec" id="btnEnviarEmail">Enviar por e-mail</button>
+        <button class="btn" id="btnGerarPdf">Gerar PDF</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Área oculta para impressão direta (mantida caso queira usar no futuro) -->
+  <div id="print-area">
+    <div class="head">
+      <div>
+        <h2>Orçamento</h2>
+        <div id="print-date"></div>
+      </div>
+      <div class="box" id="print-cliente"></div>
+    </div>
+    <div class="box">
+      <table id="print-table">
+        <colgroup>
+          <col class="col-num">
+          <col class="col-desc">
+          <col class="col-qtd">
+          <col class="col-unit">
+          <col class="col-total">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Descrição (L x C x E - Material)</th>
+            <th>Quantidade</th>
+            <th>Preço Unitário</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+          <tr>
+            <th colspan="4" style="text-align:right">Total Geral</th>
+            <th id="print-total" style="text-align:right"></th>
+          </tr>
+        </tfoot>
+      </table>
+      <div style="margin-top:10px"><strong>Condições:</strong> <span id="print-condicoes"></span></div>
+    </div>
+  </div>
+
+  <!-- jsPDF (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <script>
+    /* =========================
+       Utilidades de formatação
+       ========================= */
+    const clamp = (n)=> isFinite(n) && !isNaN(n) ? n : 0;
+    const fmtMoney5 = v => "R$ " + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:5, maximumFractionDigits:5});
+    const fmtMoney2 = v => "R$ " + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+    const escapeHtml = s => String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[m]));
+
+    /* =========================
+       Seletores principais
+       ========================= */
+    const larguraEl = document.getElementById('largura');
+    const comprimentoEl = document.getElementById('comprimento');
+    const espessuraEl = document.getElementById('espessura');
+    const tipoMaterialEl = document.getElementById('tipoMaterial');
+    const pesoTotalEl = document.getElementById('pesoTotal');
+    const valorKgEl = document.getElementById('valorKg');
+    const densidadeEl = document.getElementById('densidade');
+    const precoUnidadeInputEl = document.getElementById('precoUnidadeInput');
+    const qtdUnidadesEl = document.getElementById('qtdUnidades');
+
+    const pesoUnidadeEl = document.getElementById('pesoUnidade');
+    const qtdKgSpan = document.getElementById('qtdKg');
+    const precoUnidadeSpan = document.getElementById('precoUnidade');
+    const qtdTotalSpan = document.getElementById('qtdTotal');
+    const pesoTotalSaidaSpan = document.getElementById('pesoTotalSaida');
+    const valorTotalSpan = document.getElementById('valorTotal');
+
+    const btnSalvar = document.getElementById('btnSalvar');
+    const btnLimpar = document.getElementById('btnLimpar');
+    const countItens = document.getElementById('countItens');
+    const btnAbrirModal = document.getElementById('btnAbrirModal');
+
+    // Modal
+    const modalBg = document.getElementById('modalBg');
+    const modalClose = document.getElementById('modalClose');
+    const tbodyItens = document.getElementById('tbodyItens');
+    const btnGerarPdf = document.getElementById('btnGerarPdf');
+    const btnEnviarEmail = document.getElementById('btnEnviarEmail');
+
+    // Campos cliente
+    const clienteNome = document.getElementById('clienteNome');
+    const clienteCpfCnpj = document.getElementById('clienteCpfCnpj');
+    const clienteEmail = document.getElementById('clienteEmail');
+    const clienteTelefone = document.getElementById('clienteTelefone');
+    const clienteEndereco = document.getElementById('clienteEndereco');
+    const condicoes = document.getElementById('condicoes');
+
+    // Área de impressão (mantida caso use imprimir)
+    const printTableBody = document.querySelector('#print-table tbody');
+    const printTotal = document.getElementById('print-total');
+    const printCondicoes = document.getElementById('print-condicoes');
+    const printDate = document.getElementById('print-date');
+    const printCliente = document.getElementById('print-cliente');
+
+    /* =========================
+       Estado de itens salvos
+       { medida, material, quantidade, precoUnitario, total }
+       ========================= */
+    const itens = [];
+
+    /* =========================
+       Cálculo principal
+       ========================= */
+    function calcular(){
+      const largura = clamp(parseFloat(larguraEl.value));
+      const comprimento = clamp(parseFloat(comprimentoEl.value));
+      const espessuraMM = clamp(parseFloat(espessuraEl.value));
+      const pesoTotal = clamp(parseFloat(pesoTotalEl.value));
+      let valorKg = clamp(parseFloat(valorKgEl.value));
+      const densidade = clamp(parseFloat(densidadeEl.value));
+      const precoUnidadeInput = clamp(parseFloat(precoUnidadeInputEl.value));
+      const qtdUnidades = clamp(parseFloat(qtdUnidadesEl.value));
+
+      // volume em cm³ (espessura em mm -> cm)
+      const espessuraCM = espessuraMM / 10;
+      const volume = largura * comprimento * espessuraCM; // cm³
+      const pesoUnidadeG = volume * densidade;           // g
+      const pesoUnidadeKg = pesoUnidadeG / 1000;         // kg
+
+      // unidades por kg (exato na lógica; exibição arredondada p/ inteiro)
+      const unidadesPorKg = pesoUnidadeKg > 0 ? (1 / pesoUnidadeKg) : 0;
+
+      // deduz valorKg se faltar e tiver preço/unidade
+      if (!valorKg && precoUnidadeInput) valorKg = precoUnidadeInput / pesoUnidadeKg;
+
+      // preço por unidade
+      const precoPorUnidade = precoUnidadeInput || (valorKg * pesoUnidadeKg);
+
+      // quantidade total (inteiro)
+      let quantidadeTotal = 0;
+      if (pesoTotal) quantidadeTotal = unidadesPorKg * pesoTotal;
+      else if (qtdUnidades) quantidadeTotal = qtdUnidades;
+
+      // peso total a partir da quantidade (se não informado)
+      let pesoTotalConversao = pesoTotal;
+      if (!pesoTotal && qtdUnidades) pesoTotalConversao = pesoUnidadeKg * qtdUnidades;
+
+      // valor total
+      let valorTotal = 0;
+      if (pesoTotalConversao) valorTotal = valorKg * pesoTotalConversao;
+
+      // Saídas da tela (regras pedidas)
+      pesoUnidadeEl.textContent = pesoUnidadeKg ? (pesoUnidadeKg).toLocaleString('pt-BR',{minimumFractionDigits:0, maximumFractionDigits:5}) : '–';
+      qtdKgSpan.textContent = unidadesPorKg ? Math.floor(unidadesPorKg) : '–';
+      precoUnidadeSpan.textContent = precoPorUnidade ? ("R$ " + (precoPorUnidade).toLocaleString('pt-BR',{minimumFractionDigits:5, maximumFractionDigits:5})) : '–';
+      qtdTotalSpan.textContent = quantidadeTotal ? Math.floor(quantidadeTotal) : '–';
+      pesoTotalSaidaSpan.textContent = pesoTotalConversao ? (pesoTotalConversao).toLocaleString('pt-BR',{minimumFractionDigits:0, maximumFractionDigits:5}) : '–';
+      valorTotalSpan.textContent = valorTotal ? ("R$ " + (valorTotal).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})) : '–';
+
+      return {
+        medida: `${largura || 0} x ${comprimento || 0} x ${espessuraMM || 0}`,
+        material: (tipoMaterialEl.value || '').trim(),
+        quantidade: quantidadeTotal ? Math.floor(quantidadeTotal) : 0,
+        precoUnitario: precoPorUnidade || 0,
+        total: valorTotal || 0
+      };
+    }
+    document.querySelectorAll('#inputs input').forEach(i=>i.addEventListener('input', calcular));
+    calcular();
+
+    /* =========================
+       Salvar / Limpar itens
+       ========================= */
+    btnSalvar.addEventListener('click', ()=>{
+      const { medida, material, quantidade, precoUnitario, total } = calcular();
+      const [l,c,e] = medida.split(' x ').map(Number);
+      if (!l || !c || !e) return alert("Preencha Largura, Comprimento e Espessura.");
+      if (!quantidade) return alert("Informe Peso total (Kg) ou Quantidade de unidades.");
+      if (!precoUnitario) return alert("Informe Valor do Kg ou Preço por unidade.");
+
+      itens.push({ medida, material, quantidade, precoUnitario, total });
+      countItens.textContent = itens.length;
+    });
+
+    btnLimpar.addEventListener('click', ()=>{
+      itens.length = 0;
+      countItens.textContent = 0;
+    });
+
+    /* =========================
+       Modal: abrir/fechar e render
+       ========================= */
+    btnAbrirModal.addEventListener('click', ()=>{
+      renderModalTable();
+      modalBg.style.display = 'flex';
+    });
+    modalClose.addEventListener('click', ()=> modalBg.style.display = 'none');
+    window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') modalBg.style.display = 'none'; });
+
+    function renderModalTable(){
+      tbodyItens.innerHTML = '';
+      itens.forEach((it,idx)=>{
+        const desc = it.material ? `${it.medida} - ${it.material}` : it.medida;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${idx+1}</td>
+          <td>${desc}</td>
+          <td style="text-align:right">${it.quantidade.toLocaleString('pt-BR')}</td>
+          <td style="text-align:right">R$ ${it.precoUnitario.toLocaleString('pt-BR',{minimumFractionDigits:5, maximumFractionDigits:5})}</td>
+          <td style="text-align:right">R$ ${it.total.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+          <td class="row-actions"><button onclick="removerItem(${idx})">Excluir</button></td>
+        `;
+        tbodyItens.appendChild(tr);
+      });
+    }
+    window.removerItem = function(idx){
+      itens.splice(idx,1);
+      countItens.textContent = itens.length;
+      renderModalTable();
+    };
+
+    /* =========================
+       Máscaras com caret estável (CPF/CNPJ e Telefone)
+       ========================= */
+    function mapRawIndexToMaskedPos(rawIndex, masked){
+      let count=0;
+      for (let i=0;i<masked.length;i++){
+        if (/\d/.test(masked[i])) count++;
+        if (count>rawIndex) return i+1;
+      }
+      return masked.length;
+    }
+    function setMaskedInput(el, masker){
+      el.addEventListener('input', ()=>{
+        const start = el.selectionStart ?? el.value.length;
+        const rawBefore = el.value.slice(0, start).replace(/\D/g,'');
+        const rawIndex = rawBefore.length;
+        const masked = masker(el.value);
+        el.value = masked;
+        const newPos = mapRawIndexToMaskedPos(rawIndex, masked);
+        el.setSelectionRange(newPos, newPos);
+      });
+      el.addEventListener('blur', ()=>{ el.value = masker(el.value); });
+      el.addEventListener('focus', ()=>{ setTimeout(()=>{ const p = el.value.length; el.setSelectionRange(p,p); },0); });
+    }
+    function maskCpfCnpj(value){
+      const digits = value.replace(/\D/g,'').slice(0,14);
+      if (digits.length <= 11){
+        // CPF: 000.000.000-00
+        return digits
+          .replace(/(\d{3})(\d)/, '$1.$2')
+          .replace(/(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+          .replace(/(\d{3})\.(\d{3})\.(\d{3})(\d{1,2})$/, '$1.$2.$3-$4');
+      } else {
+        // CNPJ: 00.000.000/0000-00
+        return digits
+          .replace(/(\d{2})(\d)/, '$1.$2')
+          .replace(/(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+          .replace(/(\d{2})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3/$4')
+          .replace(/(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d{1,2})$/, '$1.$2.$3/$4-$5');
+      }
+    }
+    function maskTelefone(value){
+      const d = value.replace(/\D/g,'').slice(0,11);
+      if (d.length <= 10){
+        // (00) 0000-0000
+        return d
+          .replace(/(\d{2})(\d)/, '($1) $2')
+          .replace(/(\d{4})(\d)/, '$1-$2');
+      } else {
+        // (00) 00000-0000
+        return d
+          .replace(/(\d{2})(\d)/, '($1) $2')
+          .replace(/(\d{5})(\d)/, '$1-$2');
+      }
+    }
+    setMaskedInput(clienteCpfCnpj, maskCpfCnpj);
+    setMaskedInput(clienteTelefone, maskTelefone);
+
+    /* =========================
+       Impressão direta (mantida para referência/futuro)
+       ========================= */
+    function preencherPrintArea(){
+      const now = new Date();
+      const dataStr = now.toLocaleDateString('pt-BR') + " " + now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+      printDate.textContent = dataStr;
+
+      printCliente.innerHTML = `
+        <div><strong>Cliente:</strong> ${escapeHtml(clienteNome.value || '-')}</div>
+        <div><strong>CPF/CNPJ:</strong> ${escapeHtml(clienteCpfCnpj.value || '-')}</div>
+        <div><strong>E-mail:</strong> ${escapeHtml(clienteEmail.value || '-')}</div>
+        <div><strong>Telefone:</strong> ${escapeHtml(clienteTelefone.value || '-')}</div>
+        <div><strong>Endereço:</strong> ${escapeHtml(clienteEndereco.value || '-')}</div>
+      `;
+
+      printTableBody.innerHTML = '';
+      let totalGeral = 0;
+      itens.forEach((it, i)=>{
+        const desc = it.material ? `${it.medida} - ${it.material}` : it.medida;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td>${desc}</td>
+          <td style="text-align:right">${it.quantidade.toLocaleString('pt-BR')}</td>
+          <td style="text-align:right">R$ ${it.precoUnitario.toLocaleString('pt-BR',{minimumFractionDigits:5, maximumFractionDigits:5})}</td>
+          <td style="text-align:right">R$ ${it.total.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+        `;
+        printTableBody.appendChild(tr);
+        totalGeral += it.total;
+      });
+      printTotal.textContent = "R$ " + totalGeral.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+      printCondicoes.textContent = condicoes.value || '-';
+    }
+
+    /* =========================
+       PDF (jsPDF) com colunas fixas
+       Larguras: 10, 80, 25, 35, 35 (soma 185mm)
+       Margem esquerda: 12mm
+       ========================= */
+    function gerarPdfJsPdf(saveName="orcamento.pdf"){
+      if (!itens.length) { alert("Adicione ao menos um item."); return null; }
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({unit:'mm', format:'a4'});
+
+      // Margens e colunas
+      const marginL = 12;
+      const colW = [10, 80, 25, 35, 35]; // #, Desc, Qtd, Unit, Total
+      const x1 = marginL;                // 12
+      const x2 = x1 + colW[0];           // 22
+      const x3 = x2 + colW[1];           // 102
+      const x4 = x3 + colW[2];           // 127
+      const x5 = x4 + colW[3];           // 162
+      const tableRight = x5 + colW[4];   // 197
+
+      // Cabeçalho
+      let y = 12;
+      doc.setFontSize(16); doc.text("Orçamento", marginL, y);
+      const dataStr = new Date().toLocaleDateString('pt-BR');
+      doc.setFontSize(10); doc.text(dataStr, 198, y, {align:'right'});
+      y += 8;
+
+      const cliente = [
+        `Cliente: ${clienteNome.value || '-'}`,
+        `CPF/CNPJ: ${clienteCpfCnpj.value || '-'}`,
+        `E-mail: ${clienteEmail.value || '-'}`,
+        `Telefone: ${clienteTelefone.value || '-'}`,
+        `Endereço: ${clienteEndereco.value || '-'}`
+      ];
+      cliente.forEach(l=>{ doc.text(l, marginL, y); y+=5; });
+
+      y += 4; // “respiro” abaixo do bloco do cliente
+
+      // Cabeçalho da tabela (faixa colorida)
+      const headH = 8;
+      doc.setFillColor(230,236,255);
+      doc.rect(marginL, y, (tableRight - marginL), headH, 'F');
+      doc.setTextColor(0,0,0);
+      doc.setFontSize(10);
+      doc.text("#", x1+2, y+5);
+      doc.text("Descrição (L x C x E - Material)", x2+2, y+5);
+      doc.text("Quantidade", x3+ (colW[2]-2), y+5, {align:'right'});
+      doc.text("Preço Unitário", x4+ (colW[3]-2), y+5, {align:'right'});
+      doc.text("Total", x5+ (colW[4]-2), y+5, {align:'right'});
+      y += headH + 3; // “respiro” entre cabeçalho e primeira linha
+
+      // Função para quebrar texto dentro da coluna de descrição (80mm)
+      function wrapDesc(text){
+        return doc.splitTextToSize(text, colW[1]-4); // 2mm de margem interna de cada lado
+      }
+
+      // Linhas (faixas alternadas)
+      let totalGeral = 0;
+      const lineH = 5; // altura base por linha de texto
+      itens.forEach((it, idx)=>{
+        const desc = it.material ? `${it.medida} - ${it.material}` : it.medida;
+        const lines = wrapDesc(desc);
+        const rowH = Math.max(lineH, lines.length * lineH);
+
+        // Faixa alternada
+        const bg = idx % 2 === 0 ? [247,249,252] : [255,255,255];
+        doc.setFillColor(...bg);
+        doc.rect(marginL, y - (rowH - lineH), (tableRight - marginL), rowH, 'F');
+
+        // # (alinhado à esquerda)
+        doc.text(String(idx+1), x1+2, y);
+
+        // Descrição (quebra em múltiplas linhas)
+        let yy = y;
+        lines.forEach(line => { doc.text(line, x2+2, yy); yy += lineH; });
+
+        // Qtd / Unit / Total (alinhados à direita pela borda da coluna)
+        const qtdStr = it.quantidade.toLocaleString('pt-BR');
+        const unitStr = "R$ " + it.precoUnitario.toLocaleString('pt-BR',{minimumFractionDigits:5, maximumFractionDigits:5});
+        const totalStr = "R$ " + it.total.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+        doc.text(qtdStr, x3 + colW[2] - 2, y, {align:'right'});
+        doc.text(unitStr, x4 + colW[3] - 2, y, {align:'right'});
+        doc.text(totalStr, x5 + colW[4] - 2, y, {align:'right'});
+
+        totalGeral += it.total;
+        y += rowH + 2; // espaçamento entre linhas
+
+        // Quebra de página
+        if (y > 270){
+          doc.addPage();
+          y = 12;
+
+          doc.setFontSize(12); doc.text("Orçamento (continuação)", marginL, y);
+          doc.setFontSize(10); doc.text(new Date().toLocaleDateString('pt-BR'), 198, y, {align:'right'});
+          y += 6;
+
+          doc.setFillColor(230,236,255);
+          doc.rect(marginL, y, (tableRight - marginL), headH, 'F');
+          doc.setTextColor(0,0,0);
+          doc.setFontSize(10);
+          doc.text("#", x1+2, y+5);
+          doc.text("Descrição (L x C x E - Material)", x2+2, y+5);
+          doc.text("Quantidade", x3+ (colW[2]-2), y+5, {align:'right'});
+          doc.text("Preço Unitário", x4+ (colW[3]-2), y+5, {align:'right'});
+          doc.text("Total", x5+ (colW[4]-2), y+5, {align:'right'});
+          y += headH + 3;
+        }
+      });
+
+      // Total geral
+      y += 2;
+      doc.setFontSize(11);
+      doc.text(`Total Geral: ${fmtMoney2(totalGeral).replace('.', ',')}`, x4, y);
+      y += 6;
+
+      // Condições
+      doc.setFontSize(10);
+      doc.text(`Condições: ${condicoes.value || '-'}`, marginL, y);
+
+      // Baixar PDF
+      doc.save(saveName);
+      return true;
+    }
+
+    /* =========================
+       Ações do modal
+       ========================= */
+    btnGerarPdf.addEventListener('click', ()=>{
+      if (!itens.length) return alert("Adicione ao menos um item.");
+      gerarPdfJsPdf("orcamento.pdf");
+      modalBg.style.display = 'none';
+    });
+
+    // Enviar por e-mail (gera e baixa PDF + abre cliente padrão via mailto)
+    btnEnviarEmail.addEventListener('click', ()=>{
+      if (!itens.length) return alert("Adicione ao menos um item.");
+      const email = (clienteEmail.value || '').trim();
+      if (!email){ alert("Informe o e-mail do cliente."); return; }
+
+      const ok = gerarPdfJsPdf("orcamento.pdf");
+      if (!ok) return;
+
+      // Monta mailto
+      const assunto = encodeURIComponent("Orçamento");
+      const corpo = encodeURIComponent(
+        "Prezada(o),\n\nSegue em anexo o orçamento solicitado.\n\nAtenciosamente,"
+      );
+
+      // Espera um tick para garantir que o download começou (evita alguns blocos do navegador)
+      setTimeout(()=>{
+        window.location.href = `mailto:${encodeURIComponent(email)}?subject=${assunto}&body=${corpo}`;
+      }, 300);
+
+      modalBg.style.display = 'none';
+    });
+
+    /* =========================
+       Inicialização das máscaras
+       ========================= */
+    (function initMasks(){
+      clienteCpfCnpj.value = maskCpfCnpj(clienteCpfCnpj.value);
+      clienteTelefone.value = maskTelefone(clienteTelefone.value);
+    })();
+  </script>
+</body>
+</html>
