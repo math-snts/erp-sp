@@ -223,6 +223,14 @@
 
         <div class="mini">Revise os itens abaixo. Você pode excluir qualquer um antes de gerar.</div>
 
+        <!-- === ADICIONEI AQUI O SELETOR UN / KG (mudança solicitada) === -->
+        <div style="margin:8px 0 12px;">
+          <label style="font-weight:700;display:block;margin-bottom:6px">Formato de Quantidade no PDF</label>
+          <label style="margin-right:12px"><input type="radio" name="formatoQtd" value="un" checked> Unidade (un)</label>
+          <label><input type="radio" name="formatoQtd" value="kg"> Quilograma (kg)</label>
+        </div>
+        <!-- ========================================================= -->
+
         <!-- Tabela dos itens salvos (colunas fixas) -->
         <table class="table-modal">
           <colgroup>
@@ -354,7 +362,7 @@
 
     /* =========================
        Estado de itens salvos
-       { medida, material, quantidade, precoUnitario, total }
+       { medida, material, quantidade, precoUnitario, total, pesoUnidadeKg, pesoTotal, valorKg }
        ========================= */
     const itens = [];
 
@@ -381,7 +389,7 @@
       const unidadesPorKg = pesoUnidadeKg > 0 ? (1 / pesoUnidadeKg) : 0;
 
       // deduz valorKg se faltar e tiver preço/unidade
-      if (!valorKg && precoUnidadeInput) valorKg = precoUnidadeInput / pesoUnidadeKg;
+      if (!valorKg && precoUnidadeInput) valorKg = precoUnidadeInput / (pesoUnidadeKg || 1);
 
       // preço por unidade
       const precoPorUnidade = precoUnidadeInput || (valorKg * pesoUnidadeKg);
@@ -412,7 +420,12 @@
         material: (tipoMaterialEl.value || '').trim(),
         quantidade: quantidadeTotal ? Math.floor(quantidadeTotal) : 0,
         precoUnitario: precoPorUnidade || 0,
-        total: valorTotal || 0
+        total: valorTotal || 0,
+        // campos adicionais usados para gerar PDF no formato kg:
+        pesoUnidadeKg: pesoUnidadeKg || 0,
+        unidadesPorKg: unidadesPorKg || 0,
+        pesoTotal: pesoTotalConversao || 0, // total em kg
+        valorKg: valorKg || 0
       };
     }
     document.querySelectorAll('#inputs input').forEach(i=>i.addEventListener('input', calcular));
@@ -422,13 +435,23 @@
        Salvar / Limpar itens
        ========================= */
     btnSalvar.addEventListener('click', ()=>{
-      const { medida, material, quantidade, precoUnitario, total } = calcular();
+      const { medida, material, quantidade, precoUnitario, total, pesoUnidadeKg, pesoTotal, valorKg } = calcular();
       const [l,c,e] = medida.split(' x ').map(Number);
       if (!l || !c || !e) return alert("Preencha Largura, Comprimento e Espessura.");
       if (!quantidade) return alert("Informe Peso total (Kg) ou Quantidade de unidades.");
       if (!precoUnitario) return alert("Informe Valor do Kg ou Preço por unidade.");
 
-      itens.push({ medida, material, quantidade, precoUnitario, total });
+      // armazenamos também dados de peso e preço por kg para permitir o PDF em 'kg'
+      itens.push({
+        medida,
+        material,
+        quantidade,
+        precoUnitario,
+        total,
+        pesoUnidadeKg,
+        pesoTotal,
+        valorKg
+      });
       countItens.textContent = itens.length;
     });
 
@@ -572,6 +595,9 @@
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({unit:'mm', format:'a4'});
 
+      // Lê a escolha do usuário: 'un' ou 'kg'
+      const formatoQtd = (document.querySelector('input[name="formatoQtd"]:checked') || {value:'un'}).value;
+
       // Margens e colunas
       const marginL = 12;
       const colW = [10, 80, 25, 35, 35]; // #, Desc, Qtd, Unit, Total
@@ -639,14 +665,27 @@
         lines.forEach(line => { doc.text(line, x2+2, yy); yy += lineH; });
 
         // Qtd / Unit / Total (alinhados à direita pela borda da coluna)
-        const qtdStr = it.quantidade.toLocaleString('pt-BR');
-        const unitStr = "R$ " + it.precoUnitario.toLocaleString('pt-BR',{minimumFractionDigits:5, maximumFractionDigits:5});
-        const totalStr = "R$ " + it.total.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+        let qtdStr, unitStr, totalStr, totalCalc;
+        if (formatoQtd === 'kg') {
+          // usa peso total (kg) e preco por kg
+          const pesoItem = (typeof it.pesoTotal === 'number' && it.pesoTotal) ? it.pesoTotal : (it.quantidade * (it.pesoUnidadeKg || 0));
+          qtdStr = pesoItem ? pesoItem.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:5}) : '0,00';
+          unitStr = "R$ " + (it.valorKg || 0).toLocaleString('pt-BR',{minimumFractionDigits:5, maximumFractionDigits:5});
+          totalCalc = (it.valorKg || 0) * (pesoItem || 0);
+          totalStr = "R$ " + (totalCalc).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+        } else {
+          // usa unidades e preco por unidade
+          qtdStr = it.quantidade ? it.quantidade.toLocaleString('pt-BR') : '0';
+          unitStr = "R$ " + (it.precoUnitario || 0).toLocaleString('pt-BR',{minimumFractionDigits:5, maximumFractionDigits:5});
+          totalCalc = (it.precoUnitario || 0) * (it.quantidade || 0);
+          totalStr = "R$ " + (totalCalc).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+        }
+
         doc.text(qtdStr, x3 + colW[2] - 2, y, {align:'right'});
         doc.text(unitStr, x4 + colW[3] - 2, y, {align:'right'});
         doc.text(totalStr, x5 + colW[4] - 2, y, {align:'right'});
 
-        totalGeral += it.total;
+        totalGeral += totalCalc || 0;
         y += rowH + 2; // espaçamento entre linhas
 
         // Quebra de página
@@ -728,4 +767,3 @@
   </script>
 </body>
 </html>
-
