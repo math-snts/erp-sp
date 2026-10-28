@@ -116,7 +116,7 @@
 <div class="field full"><label>Observações</label><input id="empObs"></div></div></div><div class="actions"><button class="btn" onclick="salvarEmpresa()">Salvar empresa</button><button class="btn sec" onclick="fecharEmpresa()">Cancelar</button></div></div></div>
 <section id="historico" class="page"><h1 class="title">Histórico de cálculos</h1><div class="sub">Memória técnica local dos cálculos PEBD.</div><div class="card"><table><thead><tr><th>Data</th><th>Material</th><th>Medida</th><th>Qtd.</th><th>Peso</th><th>Valor</th></tr></thead><tbody id="histRows"></tbody></table></div></section>
 </div></main></div>
-<script>
+<script src="erp-modulos.js"></script><script>
 const brl=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}),num=(n,d=2)=>Number(n||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const SUPABASE_URL='https://iwyzhwmwkdugihxulwfq.supabase.co',SUPABASE_KEY='sb_publishable_yalP8uTIlQezFbmKy1MDtg_VyzbVQhH',db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 let empresa={}, pessoas=[], pessoaEdit=null, pessoaFiltro='', produtos=[], produtoEdit=null, composicoes=[], ordensFab=[], componentesFab=[], saldos=[], movimentos=[], vendas=[], vendaItens=[], contasReceber=[], contasPagar=[], compras=[], compraItens=[], movFinanceiros=[], usuariosErp=[], vendaTemp=[], docsEntrada=[], itensEntrada=[], entradaTemp=[], ops=[], hist=[], apont=[], ultimo=null;
@@ -208,4 +208,4 @@ estRows.innerHTML=ops.map(x=>{let r=resumoOP(x.id),pct=x.kg?Math.min(100,r.kg/x.
 renderPessoas();histRows.innerHTML=hist.map(x=>`<tr><td>${x.data}</td><td>${x.material}</td><td>${x.medida}</td><td>${num(x.qtd,0)}</td><td>${num(x.pt,3)} kg</td><td>${brl(x.valor)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nenhum cálculo salvo.</td></tr>'}
 document.querySelectorAll('#pTipoTabs .tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('#pTipoTabs .tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');pessoaFiltro=b.dataset.tipo;renderPessoas()});
 ['pL','pC','pE','pD','pQ','pKg','pV','pVU'].forEach(id=>document.getElementById(id)?.addEventListener('input',()=>{if(+pL.value>0&&+pC.value>0&&+pE.value>0&&+pD.value>0)calcPEBD()}));pQ?.addEventListener('input',()=>{if(+pQ.value>0)pKg.value=''});pKg?.addEventListener('input',()=>{if(+pKg.value>0)pQ.value=''});pV?.addEventListener('input',()=>{if(+pV.value>0)pVU.value=''});pVU?.addEventListener('input',()=>{if(+pVU.value>0)pV.value=''});aOP?.addEventListener('change',render);setInterval(()=>clock.textContent=new Date().toLocaleString('pt-BR'),1000);restaurarMenuEmbalagens();carregarBanco();
-</script><script src="erp-modulos.js"></script></body></html>
+</script></body></html>
